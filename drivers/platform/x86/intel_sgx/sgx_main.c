@@ -219,7 +219,7 @@ static int sgx_dev_init(struct device *dev)
 		}
 #endif
 		ret = sgx_add_epc_bank(sgx_epc_banks[i].pa,
-				       sgx_epc_banks[i].size);
+				       sgx_epc_banks[i].size, i);
 		if (ret) {
 			sgx_nr_epc_banks = i + 1;
 			goto out_iounmap;

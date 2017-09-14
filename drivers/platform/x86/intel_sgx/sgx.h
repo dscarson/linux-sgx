@@ -222,7 +222,7 @@ void sgx_tgid_ctx_release(struct kref *ref);
 extern struct mutex sgx_tgid_ctx_mutex;
 extern struct list_head sgx_tgid_ctx_list;
 
-int sgx_add_epc_bank(resource_size_t start, unsigned long size);
+int sgx_add_epc_bank(resource_size_t start, unsigned long size, int bank);
 int sgx_page_cache_init(void);
 void sgx_page_cache_teardown(void);
 struct sgx_epc_page *sgx_alloc_page(unsigned int flags);

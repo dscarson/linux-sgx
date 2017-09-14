@@ -388,7 +388,7 @@ static int ksgxswapd(void *p)
 	return 0;
 }
 
-int sgx_add_epc_bank(resource_size_t start, unsigned long size)
+int sgx_add_epc_bank(resource_size_t start, unsigned long size, int bank)
 {
 	unsigned long i;
 	struct sgx_epc_page *new_epc_page, *entry;
@@ -398,7 +398,7 @@ int sgx_add_epc_bank(resource_size_t start, unsigned long size)
 		new_epc_page = kzalloc(sizeof(*new_epc_page), GFP_KERNEL);
 		if (!new_epc_page)
 			goto err_freelist;
-		new_epc_page->pa = start + i;
+		new_epc_page->pa = (start + i) | bank;
 
 		spin_lock(&sgx_free_list_lock);
 		list_add_tail(&new_epc_page->list, &sgx_free_list);
@@ -557,20 +557,9 @@ void *sgx_get_page(struct sgx_epc_page *entry)
 #ifdef CONFIG_X86_32
 	return kmap_atomic_pfn(PFN_DOWN(entry->pa));
 #else
-	unsigned long offset;
-	int i;
-
-	for (i = 0; i < sgx_nr_epc_banks; i++) {
-		if (entry->pa < sgx_epc_banks[i].pa)
-			continue;
-
-		offset = entry->pa - sgx_epc_banks[i].pa;
-
-		if (offset < sgx_epc_banks[i].size)
-			return (void *)(sgx_epc_banks[i].va + offset);
-	}
-
-	return NULL;
+	int i = ((entry->pa) & ~PAGE_MASK);
+	return (void *)(sgx_epc_banks[i].va +
+		((entry->pa & PAGE_MASK) - sgx_epc_banks[i].pa));
 #endif
 }
 EXPORT_SYMBOL(sgx_get_page);
