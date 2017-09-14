@@ -84,24 +84,27 @@ enum sgx_commands {
 	EMODT	= 0xF,
 };
 
-#define __encls_ret(rax, rbx, rcx, rdx)			\
+#define IS_ENCLS_FAULT(r) ((r) & 0xffff0000)
+#define ENCLS_FAULT_VECTOR(r) ((r) >> 16)
+
+#define __encls_ret_raw(rax, rbx, rcx, rdx)		\
 	({						\
 	int ret;					\
 	asm volatile(					\
 	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
 	"2:\n"						\
 	".section .fixup,\"ax\"\n"			\
-	"3: jmp 2b\n"					\
+	"3: shll $16,%%eax\n"				\
+	"   jmp 2b\n"					\
 	".previous\n"					\
-	_ASM_EXTABLE(1b, 3b)				\
+	_ASM_EXTABLE_FAULT(1b, 3b)			\
 	: "=a"(ret)					\
 	: "a"(rax), "b"(rbx), "c"(rcx), "d"(rdx)	\
 	: "memory");					\
 	ret;						\
 	})
 
-#ifdef CONFIG_X86_64
-#define __encls(rax, rbx, rcx, rdx...)			\
+#define __encls_raw(rax, rbx, rcx, rdx...)		\
 	({						\
 	int ret;					\
 	asm volatile(					\
@@ -109,36 +112,31 @@ enum sgx_commands {
 	"   xor %%eax,%%eax;\n"				\
 	"2:\n"						\
 	".section .fixup,\"ax\"\n"			\
-	"3: movq $-1,%%rax\n"				\
+	"3: shll $16,%%eax\n"				\
 	"   jmp 2b\n"					\
 	".previous\n"					\
-	_ASM_EXTABLE(1b, 3b)				\
+	_ASM_EXTABLE_FAULT(1b, 3b)			\
 	: "=a"(ret), "=b"(rbx), "=c"(rcx)		\
 	: "a"(rax), "b"(rbx), "c"(rcx), rdx		\
 	: "memory");					\
 	ret;						\
 	})
-#else
-#define __encls(rax, rbx, rcx, rdx...)			\
-	({						\
-	int ret;					\
-	asm volatile(					\
-	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
-	"   xor %%eax,%%eax;\n"				\
-	"2:\n"						\
-	".section .fixup,\"ax\"\n"			\
-	"3: mov $-1,%%eax\n"				\
-	"   jmp 2b\n"					\
-	".previous\n"					\
-	_ASM_EXTABLE(1b, 3b)				\
-	: "=a"(ret), "=b"(rbx), "=c"(rcx)		\
-	: "a"(rax), "b"(rbx), "c"(rcx), rdx		\
-	: "memory");					\
-	ret;						\
-	})
-#endif
 
-static inline unsigned long __ecreate(struct sgx_pageinfo *pginfo, void *secs)
+#define __encls_ret(rax, rbx, rcx, rdx)			\
+	({						\
+	int ret = __encls_ret_raw(rax, rbx, rcx, rdx);	\
+	ret = IS_ENCLS_FAULT(ret) ? -EFAULT : ret;	\
+	ret;						\
+	})
+
+#define __encls(rax, rbx, rcx, rdx...)			\
+	({						\
+	int ret = __encls_raw(rax, rbx, rcx, rdx);	\
+	ret = IS_ENCLS_FAULT(ret) ? -EFAULT : ret;	\
+	ret;						\
+	})
+
+static inline int __ecreate(struct sgx_pageinfo *pginfo, void *secs)
 {
 	return __encls(ECREATE, pginfo, secs, "d"(0));
 }

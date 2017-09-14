@@ -524,7 +524,6 @@ int sgx_encl_create(struct sgx_secs *secs)
 
 	if (ret) {
 		sgx_dbg(encl, "ECREATE returned %ld\n", ret);
-		ret = -EFAULT;
 		goto out;
 	}
 
