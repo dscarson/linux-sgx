@@ -262,6 +262,7 @@ out_iounmap:
 static int sgx_drv_probe(struct platform_device *pdev)
 {
 	unsigned int eax, ebx, ecx, edx;
+	unsigned long fc;
 	int i;
 
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL)
@@ -285,6 +286,13 @@ static int sgx_drv_probe(struct platform_device *pdev)
 	}
 
 	sgx_has_sgx2 = (eax & 2) != 0;
+
+	rdmsrl(MSR_IA32_FEATURE_CONTROL, fc);
+	if ((fc & (FEATURE_CONTROL_SGX_ENABLE | FEATURE_CONTROL_LOCKED)) !=
+		(FEATURE_CONTROL_SGX_ENABLE | FEATURE_CONTROL_LOCKED)) {
+		pr_err("intel_sgx: SGX is not enabled in the feature control MSR\n");
+		return -ENODEV;
+	}
 
 	if (boot_cpu_has(X86_FEATURE_OSXSAVE)) {
 		cpuid_count(SGX_CPUID, 0x1, &eax, &ebx, &ecx, &edx);
